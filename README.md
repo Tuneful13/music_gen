@@ -10,5 +10,5 @@ posibles papers
 - Survey: A Survey on Deep Learning for Symbolic Music Generation: Representations, Algorithms, Evaluations, and Challenges
 
 
-Puede ser interesante mirar diversity loss function
+Puede ser interesante mirar diversity loss function (métodos self-supervised)
 L = Loriginal + alpha*Ldiversity
