@@ -8,3 +8,7 @@ posibles papers
 - **MMT: Multitrack Music Transformer**
 
 - Survey: A Survey on Deep Learning for Symbolic Music Generation: Representations, Algorithms, Evaluations, and Challenges
+
+
+Puede ser interesante mirar diversity loss function
+L = Loriginal + alpha*Ldiversity
