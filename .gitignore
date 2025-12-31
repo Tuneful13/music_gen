@@ -1,6 +1,7 @@
 data/
 wandb/
-exp/test_quick/
+exp/
+train_output.log
 *.mid
 *.wav
 .env
