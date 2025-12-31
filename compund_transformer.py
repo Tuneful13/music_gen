@@ -2,12 +2,10 @@ import torch
 import torch.nn as nn
 from transformers import AutoModel, AutoConfig
 
+import representation
+
 
 model_name="Qwen/Qwen2.5-1.5B"
-
-import torch
-import torch.nn as nn
-from transformers import AutoModel, AutoConfig
 
 class MusicLLM(nn.Module):
     def __init__(self, model_name_or_path="Qwen/Qwen2.5-1.5B", music_config=None):
@@ -56,31 +54,39 @@ class MusicLLM(nn.Module):
         # --- SALIDA ---
         logits_list = [head(hidden_states) for head in self.output_heads]
         return logits_list
+    
+    def freeze_backbone(self, freeze=True):
+        """
+        Si freeze=True, congela todos los parámetros del LLM (Qwen).
+        Solo se entrenarán los embeddings de música y los cabezales de salida.
+        """
+        for param in self.llm_body.parameters():
+            param.requires_grad = not freeze
+        
+        status = "CONGELADO" if freeze else "DESCONGELADO"
+        print(f"[*] El cuerpo del LLM (Qwen) ahora está: {status}")
 
 
 # --- BLOQUE DE COMPROBACIÓN (MAIN) ---
 if __name__ == "__main__":
     # 1. Parámetros de prueba
-    my_music_config = {"n_tokens": [5, 1026, 25, 129, 25, 65] }
+    encoding = representation.load_encoding("encoding.json")
     batch_size = 2
     seq_len = 1024  # Tamaño máximo que definimos antes
     
     # 2. Inicializar modelo
     # Nota: Si no tienes GPU, esto usará la CPU.
-    model = MusicLLM(music_config=my_music_config)
+    model = MusicLLM(music_config=encoding)
     model.eval() # Modo evaluación
     
-    # 3. Crear datos ficticios (Simulando lo que sale de tu MusicDataset)
-    # Cada entrada tiene 6 valores (tipo, beat, pos, pitch, dur, instr)
-    # Los valores deben estar dentro de los rangos de n_tokens
-    mock_input = torch.stack([
-        torch.randint(0, 5, (batch_size, seq_len)),     # tipo
-        torch.randint(0, 1026, (batch_size, seq_len)),  # beat
-        torch.randint(0, 25, (batch_size, seq_len)),    # pos
-        torch.randint(0, 129, (batch_size, seq_len)),   # pitch
-        torch.randint(0, 25, (batch_size, seq_len)),    # dur
-        torch.randint(0, 65, (batch_size, seq_len)),    # instr
-    ], dim=-1)
+    # 3. Crear datos ficticios dinámicamente
+    # Usamos un bucle para generar cada columna basada en su n_token correspondiente
+    mock_columns = []
+    for max_val in encoding['n_tokens']:
+        col = torch.randint(0, max_val, (batch_size, seq_len))
+        mock_columns.append(col)
+    
+    mock_input = torch.stack(mock_columns, dim=-1)
 
     print(f" Input shape: {mock_input.shape} (Batch, Seq, Atributos)")
 
@@ -95,7 +101,7 @@ if __name__ == "__main__":
     for i, l in enumerate(logits):
         print(f"🔹 {n_tokens_names[i]}: Logits shape {l.shape}")
         # La forma esperada es (batch, seq_len, n_tokens_especifico)
-        expected_shape = (batch_size, seq_len, my_music_config['n_tokens'][i])
+        expected_shape = (batch_size, seq_len, encoding['n_tokens'][i])
         assert l.shape == expected_shape, f"Error en dimensión {i}"
 
     print("\n ¡Todo funciona! El modelo procesa los 6 atributos y devuelve las predicciones alineadas.")
