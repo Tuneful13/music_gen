@@ -159,7 +159,7 @@ def main():
             scheduler.step()
 
             # WandB Train Log
-            wandb.log({"train/loss": float(loss), "train/lr": scheduler.get_last_lr()[0], "step": step})
+            wandb.log({"train/loss": loss.item(), "train/lr": scheduler.get_last_lr()[0], "step": step})
 
             recent_losses.append(float(loss))
             if len(recent_losses) > 10: del recent_losses[0]

@@ -1,4 +1,6 @@
-python train.py -d lmd --batch_size 2 --steps 100 --valid_steps 50 -lr 0.00005 --out_dir exp/test_quick
+Prueba:
+
+python train.py -g 0 -d lmd --batch_size 2 --steps 100 --valid_steps 50 -lr 0.00005 --out_dir exp/test_quick
 
 
 python train.py -d lmd \

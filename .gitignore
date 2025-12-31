@@ -1,4 +1,6 @@
 data/
+wandb/
+exp/test_quick/
 *.mid
 *.wav
 .env
