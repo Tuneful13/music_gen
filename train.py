@@ -28,7 +28,7 @@ def parse_args(args=None, namespace=None):
     parser.add_argument("-i", "--in_dir", type=pathlib.Path, help="input data directory")
     parser.add_argument("-o", "--out_dir", type=pathlib.Path, help="output directory")
     parser.add_argument("-bs", "--batch_size", default=1, type=int, help="batch size") # Default 1 para evitar OOM
-    parser.add_argument("--use_csv", action="store_true", help="save in CSV format")
+    parser.add_argument("--use_csv", action="store_true", help="save in CSV  format")
     parser.add_argument("--aug", action=argparse.BooleanOptionalAction, default=True, help="data augmentation")
     parser.add_argument("--max_seq_len", default=1024, type=int, help="max sequence length")
     parser.add_argument("--max_beat", default=1024, type=int, help="max beats")
@@ -45,6 +45,7 @@ def parse_args(args=None, namespace=None):
     parser.add_argument("-g", "--gpu", type=int, help="gpu number")
     parser.add_argument("-j", "--jobs", default=4, type=int, help="dataloader workers")
     parser.add_argument("-q", "--quiet", action="store_true")
+    parser.add_argument("-m", "--model_name", type=str, default="Qwen/Qwen2.5-1.5B", help="Hugging Face model name or path")
     return parser.parse_args(args=args, namespace=namespace)
 
 def get_lr_multiplier(step, warmup_steps, decay_end_steps, decay_end_multiplier):
@@ -92,7 +93,8 @@ def main():
     valid_loader = torch.utils.data.DataLoader(valid_dataset, args.batch_size, num_workers=args.jobs, collate_fn=dataset.MusicDataset.collate)
 
     logging.info(f"Cargando modelo en {device}...")
-    model = MusicLLM(music_config={"n_tokens": n_tokens}).to(device)
+    model_name = args.model_name
+    model = MusicLLM(model_name,music_config={"n_tokens": n_tokens}).to(device)
     
     # --- ESTRATEGIAS DE AHORRO DE MEMORIA ---
     model.freeze_backbone(True) # Congelar Qwen

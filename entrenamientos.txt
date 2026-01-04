@@ -1,12 +1,15 @@
 Prueba:
 
-python train.py -g 0 -d lmd \
-    --batch_size 1 \
-    --max_seq_len 512 \
-    --steps 100 --valid_steps 50 \
-    -lr 0.00005 --out_dir exp/test_quick
+python train.py -g 0 -d lmd --batch_size 1 --max_seq_len 512 --steps 100 --valid_steps 50 -lr 0.00005 --out_dir exp/test_quick
+
+Prueba 2: (Modelo mas pequeño)
+
+python train.py -g 0 -d lmd -m "Qwen/Qwen2.5-0.5B" --batch_size 1 --max_seq_len 512 --steps 100 --valid_steps 50 -lr 0.00005 --out_dir exp/test_quick 
 
 
 Bueno:
 
 nohup python train.py -g 0 -d lmd --batch_size 2 --max_seq_len 1024 --steps 20000 --valid_steps 1000 -lr 0.00005 --lr_warmup_steps 2000 --early_stopping --early_stopping_tolerance 15 --out_dir exp/qwen_music_v1 > train_output.log 2>&1 &
+
+En primer plano:
+python train.py -g 0 -d lmd --batch_size 2 --max_seq_len 1024 --steps 20000 --valid_steps 1000 -lr 0.00005 --lr_warmup_steps 2000 --early_stopping --early_stopping_tolerance 15 --out_dir exp/qwen_music_v1
