@@ -517,14 +517,7 @@ def encode(music, encoding):
 
 
 def decode_notes(codes, encoding):
-    """Decode codes into a note sequence.
-
-    Each row of the input is encoded as follows.
-
-        (event_type, beat, position, pitch, duration, instrument)
-
-    """
-    # Get variables and maps
+    # ... (Mapas y variables iniciales igual) ...
     code_type_map = encoding["code_type_map"]
     code_beat_map = encoding["code_beat_map"]
     code_position_map = encoding["code_position_map"]
@@ -533,37 +526,54 @@ def decode_notes(codes, encoding):
     code_instrument_map = encoding["code_instrument_map"]
     instrument_program_map = encoding["instrument_program_map"]
 
-    # Get the dimension indices
+    # Índices de dimensiones
     beat_dim = encoding["dimensions"].index("beat")
     position_dim = encoding["dimensions"].index("position")
     pitch_dim = encoding["dimensions"].index("pitch")
     duration_dim = encoding["dimensions"].index("duration")
     instrument_dim = encoding["dimensions"].index("instrument")
 
-    # Decode the codes into a sequence of notes
     notes = []
     for row in codes:
-        event_type = code_type_map[int(row[0])]
-        if event_type in ("start-of-song", "instrument", "start-of-notes"):
-            continue
-        elif event_type == "end-of-song":
-            break
-        elif event_type == "note":
-            beat = code_beat_map[int(row[beat_dim])]
-            position = code_position_map[int(row[position_dim])]
-            pitch = code_pitch_map[int(row[pitch_dim])]
-            duration_code = int(row[duration_dim])
-            duration = code_duration_map.get(duration_code, KNOWN_DURATIONS[0])
-            instrument = code_instrument_map[int(row[instrument_dim])]
-            program = instrument_program_map[instrument]
-            notes.append((beat, position, pitch, duration, program))
-            if pitch is not None:
+        try:
+            # 1. Obtener el tipo de evento de forma segura
+            event_type = code_type_map.get(int(row[0]))
+            
+            if event_type in ("start-of-song", "instrument", "start-of-notes", None):
+                continue
+            elif event_type == "end-of-song":
+                break
+            elif event_type == "note":
+                # 2. Decodificación segura de cada atributo usando .get()
+                # Si el código no existe en el diccionario, .get() devuelve None
+                beat = code_beat_map.get(int(row[beat_dim]))
+                position = code_position_map.get(int(row[position_dim]))
+                pitch = code_pitch_map.get(int(row[pitch_dim]))
+                duration = code_duration_map.get(int(row[duration_dim]))
+                instrument = code_instrument_map.get(int(row[instrument_dim]))
+
+                # 3. VERIFICACIÓN CRÍTICA:
+                # Si alguno es None, la nota es inválida. 
+                # El KeyError de tu anterior error ocurría porque 'instrument' era None
+                if any(v is None for v in (beat, position, pitch, duration, instrument)):
+                    continue
+                
+                # 4. Obtener el programa MIDI (aquí fallaba antes)
+                program = instrument_program_map.get(instrument)
+                if program is None:
+                    continue # Ignoramos notas con instrumentos desconocidos
+
+                # 5. Añadir la nota (SOLO UNA VEZ)
                 notes.append((beat, position, pitch, duration, program))
-        else:
-            raise ValueError("Unknown event type.")
+                
+            else:
+                continue # Ignorar tipos desconocidos en lugar de lanzar error
+
+        except Exception:
+            # Si algo falla en el proceso (ej. un valor no es entero), saltamos la fila
+            continue
 
     return notes
-
 
 def reconstruct(notes, resolution):
     """Reconstruct a note sequence to a MusPy Music object."""

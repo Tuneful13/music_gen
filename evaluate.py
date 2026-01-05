@@ -13,7 +13,7 @@ import torch.utils.data
 import tqdm
 
 import dataset
-from compund_transformer import MusicLLM 
+from compound_transformer import MusicLLM 
 import representation
 import utils
 

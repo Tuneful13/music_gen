@@ -3,7 +3,7 @@ import pathlib
 import numpy as np
 import muspy
 import representation
-from compund_transformer import MusicLLM
+from compound_transformer import MusicLLM
 import gc
 
 # ==========================================

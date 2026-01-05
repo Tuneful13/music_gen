@@ -15,7 +15,7 @@ import wandb
 from dotenv import load_dotenv
 
 import dataset
-from compund_transformer import MusicLLM 
+from compound_transformer import MusicLLM 
 import representation
 import utils
 
@@ -84,7 +84,7 @@ def main():
         handlers=[logging.FileHandler(args.out_dir / "train.log", "w"), logging.StreamHandler(sys.stdout)])
 
     device = torch.device(f"cuda:{args.gpu}" if args.gpu is not None else "cpu")
-    encoding = representation.load_encoding(args.in_dir / "encoding.json")
+    encoding = representation.load_encoding("encoding.json")
     n_tokens = encoding['n_tokens']
 
     train_dataset = dataset.MusicDataset(args.train_names, args.in_dir, encoding, max_seq_len=args.max_seq_len, max_beat=args.max_beat, use_augmentation=args.aug, use_csv=args.use_csv)
@@ -92,18 +92,28 @@ def main():
     valid_dataset = dataset.MusicDataset(args.valid_names, args.in_dir, encoding, max_seq_len=args.max_seq_len, max_beat=args.max_beat, use_csv=args.use_csv)
     valid_loader = torch.utils.data.DataLoader(valid_dataset, args.batch_size, num_workers=args.jobs, collate_fn=dataset.MusicDataset.collate)
 
-    logging.info(f"Cargando modelo en {device}...")
-    model_name = args.model_name
-    model = MusicLLM(model_name,music_config={"n_tokens": n_tokens}).to(device)
+
+    logging.info(f"Cargando MusicLLM con LoRA  en {device}...")
+    model = MusicLLM(model_name_or_path=args.model_name,music_config={"n_tokens": n_tokens},use_lora=True).to(device)
     
     # --- ESTRATEGIAS DE AHORRO DE MEMORIA ---
-    model.freeze_backbone(True) # Congelar Qwen
+    model.print_trainable_parameters()
     model.llm_body.gradient_checkpointing_enable() # NUEVO: Ahorro masivo de VRAM
     
-    optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), args.learning_rate)
+    # Separamos los parámetros del LLM de los componentes musicales
+    lora_params = [p for n, p in model.named_parameters() if "llm_body" in n and p.requires_grad]
+    music_params = [p for n, p in model.named_parameters() if "llm_body" not in n and p.requires_grad]
+
+    optimizer = torch.optim.AdamW([
+        {'params': lora_params, 'lr': args.learning_rate * 0.1}, # El LLM se ajusta suavemente
+        {'params': music_params, 'lr': args.learning_rate}      # Los cabezales aprenden rápido
+    ], weight_decay=0.01)
+    
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda step: get_lr_multiplier(step, args.lr_warmup_steps, args.lr_decay_steps, args.lr_decay_multiplier))
     
-    # NUEVO: Scaler moderno (torch.amp)
+    
+
+    # Scaler moderno (torch.amp)
     scaler = torch.amp.GradScaler('cuda')
 
     loss_csv = open(args.out_dir / "loss.csv", "w")
@@ -127,7 +137,8 @@ def main():
             optimizer.zero_grad()
             
             with torch.amp.autocast('cuda'):
-                logits_list = model(inputs, attention_mask=input_mask)
+                # Pasamos targets[:, :, 0] que es la columna de "Tipo" que el modelo debe predecir
+                logits_list = model(inputs, attention_mask=input_mask, target_types=targets[:, :, 0])
                 loss, _ = compute_loss(logits_list, targets, input_mask, n_tokens)
             
             scaler.scale(loss).backward()
@@ -157,7 +168,8 @@ def main():
                 inputs, targets, input_mask = seq[:, :-1, :], seq[:, 1:, :], mask[:, :-1]
                 
                 with torch.amp.autocast('cuda'):
-                    logits_list = model(inputs, attention_mask=input_mask)
+                    # También en validación pasamos los tipos para una métrica justa
+                    logits_list = model(inputs, attention_mask=input_mask, target_types=targets[:, :, 0])
                     loss, ind_losses = compute_loss(logits_list, targets, input_mask, n_tokens)
                 
                 batch_size = len(batch["seq"]) # Usamos el tamaño real del batch
