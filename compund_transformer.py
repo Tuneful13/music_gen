@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from transformers import AutoModel, AutoConfig
+import torch.nn.functional as F
 
 import representation
 
@@ -54,6 +55,54 @@ class MusicLLM(nn.Module):
         # --- SALIDA ---
         logits_list = [head(hidden_states) for head in self.output_heads]
         return logits_list
+
+    @torch.no_grad()
+    def generate(self, start_tokens, max_len, temperature=1.0, eos_token=None, top_k=0):
+        """
+        Generación autorregresiva integrada.
+        start_tokens: Tensor [batch, seq_len, 6]
+        """
+        self.eval()
+        generated = start_tokens
+        device = start_tokens.device
+
+        for _ in range(max_len):
+            # 1. Forward pass
+            logits_list = self.forward(generated)
+            
+            # 2. Obtener logits del último paso para los 6 atributos
+            next_step_tokens = []
+            for i in range(6):
+                # Logits: [batch, vocab_size]
+                l_i = logits_list[i][:, -1, :] / temperature
+
+                # --- FIX: Ajuste dinámico de Top-K ---
+                # Si el vocabulario es menor que top_k, usamos el tamaño del vocabulario
+                k = min(top_k, l_i.size(-1)) 
+
+                if k > 0:
+                    # Usamos la variable 'k' en lugar de 'top_k'
+                    indices_to_remove = l_i < torch.topk(l_i, k)[0][..., -1, None]
+                    l_i[indices_to_remove] = -float('Inf')
+                # -------------------------------------
+
+                # Sampling
+                probs = F.softmax(l_i, dim=-1)
+                next_t = torch.multinomial(probs, num_samples=1)
+                next_step_tokens.append(next_t)
+
+            # 3. Concatenar y añadir a la secuencia
+            # next_step shape: [batch, 1, 6]
+            next_step = torch.cat(next_step_tokens, dim=-1).unsqueeze(1)
+            generated = torch.cat((generated, next_step), dim=1)
+
+            # 4. Condición de parada (EOS)
+            if eos_token is not None:
+                # Si el primer atributo (Tipo) es EOS
+                if next_step_tokens[0].item() == eos_token:
+                    break
+
+        return generated
     
     def freeze_backbone(self, freeze=True):
         """

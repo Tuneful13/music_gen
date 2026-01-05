@@ -552,10 +552,13 @@ def decode_notes(codes, encoding):
             beat = code_beat_map[int(row[beat_dim])]
             position = code_position_map[int(row[position_dim])]
             pitch = code_pitch_map[int(row[pitch_dim])]
-            duration = code_duration_map[int(row[duration_dim])]
+            duration_code = int(row[duration_dim])
+            duration = code_duration_map.get(duration_code, KNOWN_DURATIONS[0])
             instrument = code_instrument_map[int(row[instrument_dim])]
             program = instrument_program_map[instrument]
             notes.append((beat, position, pitch, duration, program))
+            if pitch is not None:
+                notes.append((beat, position, pitch, duration, program))
         else:
             raise ValueError("Unknown event type.")
 
@@ -564,19 +567,23 @@ def decode_notes(codes, encoding):
 
 def reconstruct(notes, resolution):
     """Reconstruct a note sequence to a MusPy Music object."""
-    # Construct the MusPy Music object
     music = muspy.Music(resolution=resolution, tempos=[muspy.Tempo(0, 100)])
 
     # Append the tracks
-    programs = sorted(set(note[-1] for note in notes))
+    programs = sorted(set(note[-1] for note in notes if note[-1] is not None))
     for program in programs:
         music.tracks.append(muspy.Track(program))
 
     # Append the notes
     for beat, position, pitch, duration, program in notes:
-        time = beat * resolution + position
-        track_idx = programs.index(program)
-        music[track_idx].notes.append(muspy.Note(time, pitch, duration))
+        # --- BLINDAJE: Si falta algún dato esencial, saltamos la nota ---
+        if any(v is None for v in (beat, position, pitch, duration, program)):
+            continue
+            
+        time = int(beat * resolution + position)
+        if program in programs:
+            track_idx = programs.index(program)
+            music[track_idx].notes.append(muspy.Note(time, pitch, duration))
 
     return music
 
@@ -788,16 +795,11 @@ def main():
     
     # 5. Renderizar a audio usando la nueva función
     # Asegúrate de que 'MS_Basic.sf2' esté en la misma carpeta
-    audio_player = advanced_decode(
-        codes, 
-        encoding,
-    )
+    advanced_decode(codes,encoding)
 
     print("-" * 40)
     print("Proceso completado. El archivo 'test_example.wav' ha sido generado.")
     
-    # Si estás en un Notebook, esto mostrará el reproductor:
-    return audio_player
 
 
 if __name__ == "__main__":
