@@ -1,3 +1,5 @@
+![](imgs/model.png)
+
 # TRAIN
 
 ## Prueba:
