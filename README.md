@@ -1,14 +1,25 @@
-# music_gen
+# TRAIN
 
-posibles papers
+## Prueba:
 
-- MuseCoco: Generating Symbolic Music from Text
-- GETMusic: Generating Any Music Tracks with a Unified Representation and Diffusion Framework
+python train.py -g 0 -d lmd --batch_size 1 --max_seq_len 512 --steps 100 --valid_steps 50 -lr 0.00005 --out_dir exp/test_quick
 
-- **MMT: Multitrack Music Transformer**
+#### Prueba 2: (Modelo mas pequeño)
 
-- Survey: A Survey on Deep Learning for Symbolic Music Generation: Representations, Algorithms, Evaluations, and Challenges
+python train.py -g 0 -d lmd -m "Qwen/Qwen2.5-0.5B" --batch_size 1 --max_seq_len 512 --steps 100 --valid_steps 50 -lr 0.00005 --out_dir exp/test_quick 
+
+## LMD:
+
+nohup python train.py -g 0 -d lmd --batch_size 2 --max_seq_len 1024 --steps 20000 --valid_steps 1000 -lr 0.00005 --lr_warmup_steps 2000 --early_stopping --early_stopping_tolerance 15 --out_dir exp/qwen_music_v1 > train_output.log 2>&1 &
+
+#### En primer plano:
+python train.py -g 0 -d lmd --batch_size 2 --max_seq_len 1024 --steps 20000 --valid_steps 1000 -lr 0.00005 --lr_warmup_steps 2000 --early_stopping --early_stopping_tolerance 15 --out_dir exp/qwen_music_v1
+
+## SOD
+
+nohup python train.py -g 0 -d sod --batch_size 8 --out_dir exp/sod_qwen1.5b > train_output.log 2>&1 &
 
 
-Puede ser interesante mirar diversity loss function (métodos self-supervised)
-L = Loriginal + alpha*Ldiversity
+# EVALUATE:
+
+python evaluate.py -d lmd -o exp/qwen_music_v1 --temperature 0.8
